@@ -6,35 +6,35 @@ import math
 tensorflow实现的mlp类
 '''
 class Mlp(object):
-    def __init__(self,layer_number=3,hidden_units=[200,100,300]):
+    def __init__(self,featurecount,layer_number=3,hidden_units=[200,100,300]):
         self.layer_numer=layer_number#层数
         self.hidden_units=hidden_units #每层对应的单元数
-        self.input_x=tf.placeholder(shape=[None,None],dtype=tf.int32,name='input_x')
-        self.target_y=tf.placeholder(shape=[None,None],dtype=tf.int32,name='target_y')
+        self.input_x=tf.placeholder(shape=[None,featurecount],dtype=tf.float32,name='input_x')
+        self.target_y=tf.placeholder(shape=[None,None],dtype=tf.float32,name='target_y')
         self.lr=tf.placeholder(dtype=tf.float32,name='learning_rate')
         self.prob=tf.placeholder(dtype=tf.float32,name='dropout')
 
         #variables
-        feature_count=input_x.get_shape()[1]  #特征数
+        #feature_count=self.input_x.get_shape()[1]  #特征数
         weights={
-            'h1':tf.Variable(tf.random_norm([feature_count,self.hidden_units[0]])),
-            'h2': tf.Variable(tf.random_norm([self.hidden_units[0],self.hidden_units[1]])),
-            'h3': tf.Variable(tf.random_norm([self.hidden_units[1],self.hidden_units[2]]))
+            'h1':tf.Variable(tf.random_normal([featurecount,self.hidden_units[0]])),
+            'h2': tf.Variable(tf.random_normal([self.hidden_units[0],self.hidden_units[1]])),
+            'h3': tf.Variable(tf.random_normal([self.hidden_units[1],self.hidden_units[2]]))
         }
         biass={
-            'h1':tf.Variable(tf.random_norm([self.hidden_units[0]])),
-            'h2': tf.Variable(tf.random_norm([self.hidden_units[1]])),
-            'h3': tf.Variable(tf.random_norm([self.hidden_units[2]]))
+            'h1':tf.Variable(tf.random_normal([self.hidden_units[0]])),
+            'h2': tf.Variable(tf.random_normal([self.hidden_units[1]])),
+            'h3': tf.Variable(tf.random_normal([self.hidden_units[2]]))
         }
         #network
-        z1=tf.add(tf.matmul(input_x,weights['h1']),biass['h1'])
+        z1=tf.add(tf.matmul(self.input_x,weights['h1']),biass['h1'])
         z1=tf.nn.dropout(z1,self.prob)
         a1=tf.nn.relu(z1)
         z2=tf.add(tf.matmul(a1,weights['h2']),biass['h2'])
         z2=tf.nn.dropout(z2,self.prob)
         a2=tf.nn.relu(z2)
         self.logits=tf.add(tf.matmul(a2,weights['h3']),biass['h3'])
-        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(self.logits,self.target_y)
+        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,labels=self.target_y)
         #梯度裁剪
         tvars=tf.trainable_variables()
         opt=tf.train.GradientDescentOptimizer(learning_rate=self.lr)
@@ -45,13 +45,20 @@ class Mlp(object):
         capped_grads_and_vars=[(tf.clip_by_value(grad,-5.,5.),var) for grad,var in grads_and_vars if grad is not None]
         self.train_op=opt.apply_gradients(capped_grads_and_vars)
         #prediction  用来预测
-        self.prediction=tf.sigmoid(self.logits)
+        self.prediction=tf.sigmoid(self.logits)>0.5
+        self.accuracy=tf.reduce_mean(tf.cast(self.prediction,"float"))
     #数据填充
     def train(self,X,Y,epochs=10,batch_size=128,learning_rate=0.001,dropout=0.5):
         #测试集和验证集划分
         split_point=math.ceil(len(X)*0.8)
         test_X,test_Y=X[:split_point],Y[:split_point]
         valid_X,valid_Y=X[split_point:],Y[split_point:]
+        #归一化
+        from sklearn.preprocessing import StandardScaler
+        sc = StandardScaler()
+        test_X = sc.fit_transform(test_X)
+        valid_X = sc.transform(valid_X)
+
         with tf.Session() as sess:
             #writer = tf.summary.FileWriter("logs/", sess.graph)
             init=tf.global_variables_initializer()
@@ -61,13 +68,13 @@ class Mlp(object):
                     feed={self.input_x:x,self.target_y:y,self.lr:learning_rate,self.prob:dropout}
                     loss,_=sess.run([self.loss,self.train_op],feed)
                     if batch_index%10==0:
-                        val_loss=sess.run(self.loss,{self.input_x:valid_X,self.target_y:valid_Y,self.prob:1.})
-                        print('Epoch {:>3}/{} Batch {:>4}/{} - Loss: {:>6.3f}  - Validation loss: {:>6.3f}'
+                        val_accuracy=sess.run(self.accuracy,{self.input_x:valid_X,self.target_y:valid_Y,self.prob:1.})
+                        print('Epoch {:>3}/{} Batch {:>4}/{} - Loss: {:>6.3f}  - Validation accuracy: {:>6.3f}'
                               .format(e,
                                       epochs,
                                       batch_index,
                                       len(test_X) // batch_size,
-                                      loss,val_loss))
+                                      loss,val_accuracy))
 
     def get_batchs(self,X,Y,batch_size=128):
         batches=len(X)//batch_size
