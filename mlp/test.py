@@ -5,7 +5,7 @@ import pandas as pd
 from mlp import Mlp
 
 # Importing the dataset
-dataset = pd.read_csv('Churn_Modelling.csv')
+dataset = pd.read_csv('../Churn_Modelling.csv')
 X = dataset.iloc[:, 3:13].values
 Y = dataset.iloc[:, 13].values
 

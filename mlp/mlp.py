@@ -42,13 +42,13 @@ class Mlp(object):
         self.loss=tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,labels=self.target_y))
         #梯度裁剪
         tvars=tf.trainable_variables()
-        opt=tf.train.GradientDescentOptimizer(learning_rate=self.lr)
-        #计算  <list of variables>相关的梯度
-        grads_and_vars=opt.compute_gradients(self.loss,tvars)
-        #grads_and_vars为tuples（gradient,variable）组成的列表
-        #对梯度进行想要的处理
-        capped_grads_and_vars=[(tf.clip_by_value(grad,-5.,5.),var) for grad,var in grads_and_vars if grad is not None]
-        self.train_op=opt.apply_gradients(capped_grads_and_vars)
+        self.opt=tf.train.GradientDescentOptimizer(learning_rate=self.lr).minimize(self.loss)
+        # #计算  <list of variables>相关的梯度
+        # grads_and_vars=opt.compute_gradients(self.loss,tvars)
+        # #grads_and_vars为tuples（gradient,variable）组成的列表
+        # #对梯度进行想要的处理
+        # capped_grads_and_vars=[(tf.clip_by_value(grad,-5.,5.),var) for grad,var in grads_and_vars if grad is not None]
+        # self.train_op=opt.apply_gradients(capped_grads_and_vars)
         #prediction  用来预测
         self.prediction=tf.sigmoid(self.logits)>0.5
         self.accuracy=tf.reduce_mean(tf.cast(self.prediction,"float"))
@@ -71,7 +71,7 @@ class Mlp(object):
             for e in range(1,epochs+1):
                 for batch_index,(x,y) in enumerate(self.get_batchs(test_X,test_Y,batch_size)):
                     feed={self.input_x:x,self.target_y:y,self.lr:learning_rate,self.prob:dropout}
-                    loss,_=sess.run([self.loss,self.train_op],feed)
+                    loss,_=sess.run([self.loss,self.opt],feed)
                     if batch_index%10==0:
                         val_accuracy=sess.run(self.accuracy,{self.input_x:valid_X,self.target_y:np.transpose(valid_Y[None,:]),self.prob:1.})
                         print('Epoch {:>3}/{} Batch {:>4}/{} - Loss: {:>6.3f}  - Validation accuracy: {:>6.3f}'
