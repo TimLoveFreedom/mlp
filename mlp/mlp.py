@@ -10,7 +10,7 @@ class Mlp(object):
         self.layer_numer=layer_number#层数
         self.hidden_units=hidden_units #每层对应的单元数
         self.input_x=tf.placeholder(shape=[None,featurecount],dtype=tf.float32,name='input_x')
-        self.target_y=tf.placeholder(shape=[None,None],dtype=tf.float32,name='target_y')
+        self.target_y=tf.placeholder(shape=[None,1],dtype=tf.float32,name='target_y')
         self.lr=tf.placeholder(dtype=tf.float32,name='learning_rate')
         self.prob=tf.placeholder(dtype=tf.float32,name='dropout')
 
@@ -19,22 +19,27 @@ class Mlp(object):
         weights={
             'h1':tf.Variable(tf.random_normal([featurecount,self.hidden_units[0]])),
             'h2': tf.Variable(tf.random_normal([self.hidden_units[0],self.hidden_units[1]])),
-            'h3': tf.Variable(tf.random_normal([self.hidden_units[1],self.hidden_units[2]]))
+            'h3': tf.Variable(tf.random_normal([self.hidden_units[1],self.hidden_units[2]])),
+            'h4': tf.Variable(tf.random_normal([self.hidden_units[2], 1]))
         }
         biass={
             'h1':tf.Variable(tf.random_normal([self.hidden_units[0]])),
             'h2': tf.Variable(tf.random_normal([self.hidden_units[1]])),
-            'h3': tf.Variable(tf.random_normal([self.hidden_units[2]]))
+            'h3': tf.Variable(tf.random_normal([self.hidden_units[2]])),
+            'h4': tf.Variable(tf.random_normal([1]))
         }
         #network
         z1=tf.add(tf.matmul(self.input_x,weights['h1']),biass['h1'])
-        z1=tf.nn.dropout(z1,self.prob)
         a1=tf.nn.relu(z1)
+        #a1 = tf.nn.dropout(a1, self.prob)
         z2=tf.add(tf.matmul(a1,weights['h2']),biass['h2'])
-        z2=tf.nn.dropout(z2,self.prob)
         a2=tf.nn.relu(z2)
-        self.logits=tf.add(tf.matmul(a2,weights['h3']),biass['h3'])
-        self.loss=tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,labels=self.target_y)
+        #a2 = tf.nn.dropout(a2, self.prob)
+        z3 = tf.add(tf.matmul(a2, weights['h3']), biass['h3'])
+        a3 = tf.nn.relu(z3)
+        #a3 = tf.nn.dropout(a3, self.prob)
+        self.logits=tf.add(tf.matmul(a3,weights['h4']),biass['h4'])
+        self.loss=tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,labels=self.target_y))
         #梯度裁剪
         tvars=tf.trainable_variables()
         opt=tf.train.GradientDescentOptimizer(learning_rate=self.lr)
@@ -48,7 +53,7 @@ class Mlp(object):
         self.prediction=tf.sigmoid(self.logits)>0.5
         self.accuracy=tf.reduce_mean(tf.cast(self.prediction,"float"))
     #数据填充
-    def train(self,X,Y,epochs=10,batch_size=128,learning_rate=0.001,dropout=0.5):
+    def train(self,X,Y,epochs=10,batch_size=128,learning_rate=0.005,dropout=0.5):
         #测试集和验证集划分
         split_point=math.ceil(len(X)*0.8)
         test_X,test_Y=X[:split_point],Y[:split_point]
@@ -68,7 +73,7 @@ class Mlp(object):
                     feed={self.input_x:x,self.target_y:y,self.lr:learning_rate,self.prob:dropout}
                     loss,_=sess.run([self.loss,self.train_op],feed)
                     if batch_index%10==0:
-                        val_accuracy=sess.run(self.accuracy,{self.input_x:valid_X,self.target_y:valid_Y,self.prob:1.})
+                        val_accuracy=sess.run(self.accuracy,{self.input_x:valid_X,self.target_y:np.transpose(valid_Y[None,:]),self.prob:1.})
                         print('Epoch {:>3}/{} Batch {:>4}/{} - Loss: {:>6.3f}  - Validation accuracy: {:>6.3f}'
                               .format(e,
                                       epochs,
@@ -78,9 +83,9 @@ class Mlp(object):
 
     def get_batchs(self,X,Y,batch_size=128):
         batches=len(X)//batch_size
-        for i in range(batch_size):
-            X_batch=X[i*batch_size,i*batch_size+batch_size]
-            Y_batch=Y[i*batch_size,i*batch_size+batch_size]
+        for i in range(batches):
+            X_batch=X[i*batch_size:i*batch_size+batch_size]
+            Y_batch=np.transpose(Y[i*batch_size:i*batch_size+batch_size][None, :])
             yield X_batch,Y_batch
 
 

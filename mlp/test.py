@@ -22,4 +22,4 @@ X[:, 2] = labelencoder_X_2.fit_transform(X[:, 2])
 
 
 mlp=Mlp(len(X[0]))
-mlp.train(X,Y,epochs=10,batch_size=100)
+mlp.train(X,Y,epochs=100,batch_size=100)
