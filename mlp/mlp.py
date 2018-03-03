@@ -31,13 +31,13 @@ class Mlp(object):
         #network
         z1=tf.add(tf.matmul(self.input_x,weights['h1']),biass['h1'])
         a1=tf.nn.relu(z1)
-        #a1 = tf.nn.dropout(a1, self.prob)
+        a1 = tf.nn.dropout(a1, self.prob)
         z2=tf.add(tf.matmul(a1,weights['h2']),biass['h2'])
         a2=tf.nn.relu(z2)
-        #a2 = tf.nn.dropout(a2, self.prob)
+        a2 = tf.nn.dropout(a2, self.prob)
         z3 = tf.add(tf.matmul(a2, weights['h3']), biass['h3'])
         a3 = tf.nn.relu(z3)
-        #a3 = tf.nn.dropout(a3, self.prob)
+        a3 = tf.nn.dropout(a3, self.prob)
         self.logits=tf.add(tf.matmul(a3,weights['h4']),biass['h4'])
         self.loss=tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,labels=self.target_y))
         #梯度裁剪
@@ -51,9 +51,9 @@ class Mlp(object):
         # self.train_op=opt.apply_gradients(capped_grads_and_vars)
         #prediction  用来预测
         self.prediction=tf.sigmoid(self.logits)>0.5
-        self.accuracy=tf.reduce_mean(tf.cast(self.prediction,"float"))
+        #self.accuracy=tf.reduce_mean(tf.equal(tf.cast(self.prediction,"float32"),self.target_y))
     #数据填充
-    def train(self,X,Y,epochs=10,batch_size=128,learning_rate=0.005,dropout=0.5):
+    def train(self,X,Y,epochs=10,batch_size=128,learning_rate=0.001,dropout=0.5):
         #测试集和验证集划分
         split_point=math.ceil(len(X)*0.8)
         test_X,test_Y=X[:split_point],Y[:split_point]
@@ -73,7 +73,8 @@ class Mlp(object):
                     feed={self.input_x:x,self.target_y:y,self.lr:learning_rate,self.prob:dropout}
                     loss,_=sess.run([self.loss,self.opt],feed)
                     if batch_index%10==0:
-                        val_accuracy=sess.run(self.accuracy,{self.input_x:valid_X,self.target_y:np.transpose(valid_Y[None,:]),self.prob:1.})
+                        val_predict=sess.run(self.prediction,{self.input_x:valid_X,self.target_y:np.transpose(valid_Y[None,:]),self.prob:1.})
+                        val_accuracy=np.mean(np.equal(valid_Y,val_predict))
                         print('Epoch {:>3}/{} Batch {:>4}/{} - Loss: {:>6.3f}  - Validation accuracy: {:>6.3f}'
                               .format(e,
                                       epochs,
